@@ -1,6 +1,6 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
 import torch
-import pickle
 import os
 import uvicorn
 
@@ -9,19 +9,35 @@ model = None
 
 def load_model():
     global model
-    model_path = "model/best_model/data.pkl"
-    if os.path.exists(model_path):
-        with open(model_path, "rb") as f:
-            # YE MOST IMPORTANT LINE HAI
-            model = pickle.load(f, map_location=torch.device('cpu'))
-        print("✅ Model loaded on CPU")
-        return True
-    print("❌ Model file not found")
-    return False
+    try:
+        model_path = "model/best_model/data.pkl"
+        
+        if os.path.exists(model_path):
+            # YEH SAHI HAI - torch.load use karo, pickle.load nahi
+            model = torch.load(model_path, map_location=torch.device('cpu'))
+            print("✅ Model loaded on CPU")
+            return True
+        else:
+            print(f"❌ Model not found: {model_path}")
+            return False
+    except Exception as e:
+        print(f"⚠️ Error: {e}")
+        return False
+
+class InputData(BaseModel):
+    text: str
+
+@app.post("/predict")
+async def predict(data: InputData):
+    return {"prediction": "ok", "input": data.text}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "model_loaded": model is not None}
 
 @app.get("/")
-def root():
-    return {"status": "running", "model_loaded": model is not None}
+async def root():
+    return {"message": "API running"}
 
 if __name__ == "__main__":
     load_model()
